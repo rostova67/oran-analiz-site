@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oran Analiz Paneli</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @font-face {
+            font-family: 'Century Gothic';
+            src: local('Century Gothic'), local('CenturyGothic');
+        }
+        body {
+            font-family: 'Century Gothic', sans-serif, system-ui;
+            background-color: #0c0a1d;
+            color: #e2e8f0;
+        }
+        .bg-purple-panel { background-color: #131129; }
+        .bg-purple-card { background-color: #1a1735; }
+        .border-purple-custom { border-color: #2e2a52; }
+    </style>
+</head>
+<body class="flex flex-col md:flex-row min-h-screen md:h-screen md:overflow-hidden relative">
+
+    <!-- 20 SANİYE KİLİTLENME VE YÜKLENME EKRANI -->
+    <div id="initial-overlay" class="fixed inset-0 bg-slate-950/95 z-50 flex flex-col items-center justify-center space-y-4 p-4 text-center">
+        <div class="w-12 h-12 md:w-16 md:h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+        <div class="text-lg md:text-xl font-bold text-white tracking-wide">Veriler Arka Planda Hazırlanıyor...</div>
+        <div class="text-slate-400 text-xs md:text-sm">Lütfen bekleyin (<span id="timer" class="text-amber-400 font-bold">20</span>s)</div>
+    </div>
+
+    <!-- MOBİL VE MASAÜSTÜ UYUMLU SOL MENÜ -->
+    <aside class="w-full md:w-64 bg-purple-panel border-b md:border-b-0 md:border-r border-purple-custom flex flex-col justify-between p-4 flex-shrink-0">
+        <div class="space-y-4 md:space-y-6">
+            <div class="flex items-center justify-between">
+                <h1 class="text-lg md:text-xl font-bold tracking-wider text-white">MENÜ</h1>
+            </div>
+
+            <nav class="grid grid-cols-2 md:grid-cols-1 gap-2 text-xs md:text-sm">
+                <button onclick="switchTab('tum')" id="btn-tum" class="w-full text-left px-3 py-2.5 rounded flex items-center gap-2 bg-purple-card border border-purple-custom">
+                    <span id="dot-tum" class="w-2.5 h-2.5 rounded-full bg-red-500 border border-red-400 flex-shrink-0"></span> 
+                    <span class="truncate">Tüm Maçlar Seç</span>
+                </button>
+                <button onclick="switchTab('yeni')" id="btn-yeni" class="w-full text-left px-3 py-2.5 rounded flex items-center gap-2 bg-purple-card border border-purple-custom">
+                    <span id="dot-yeni" class="w-2.5 h-2.5 rounded-full border border-slate-400 flex-shrink-0"></span> 
+                    <span class="truncate">Yeni Maçlar Seç</span>
+                </button>
+                <button onclick="switchTab('enler')" id="btn-enler" class="w-full text-left px-3 py-2.5 rounded flex items-center gap-2 bg-purple-card border border-purple-custom">
+                    <span id="dot-enler" class="w-2.5 h-2.5 rounded-full border border-slate-400 flex-shrink-0"></span> 
+                    <span class="truncate">🔥 BUGÜNÜN ENLERİ</span>
+                </button>
+                <button onclick="switchTab('takim')" id="btn-takim" class="w-full text-left px-3 py-2.5 rounded flex items-center gap-2 bg-purple-card border border-purple-custom">
+                    <span id="dot-takim" class="w-2.5 h-2.5 rounded-full border border-slate-400 flex-shrink-0"></span> 
+                    <span class="truncate">👥 TAKIM DETAY</span>
+                </button>
+            </nav>
+        </div>
+    </aside>
+
+    <!-- SAĞ ANA İÇERİK ALANI -->
+    <main class="flex-1 overflow-y-auto p-3 md:p-6 space-y-4 md:space-y-6">
+
+        <!-- SAYFA 1 & 2: MAÇ ANALİZ (YENİ VE TÜM) -->
+        <div id="page-select-match" class="space-y-4 md:space-y-6">
+            <h2 id="select-title" class="text-xl md:text-2xl font-bold text-white">📂 MAÇ ANALİZİ</h2>
+            
+            <div class="bg-purple-panel p-3 md:p-4 rounded-lg border border-purple-custom space-y-2">
+                <div class="flex justify-between items-center">
+                    <label class="text-xs text-slate-400 font-semibold uppercase">Maç Seçiniz</label>
+                    <span class="text-[10px] text-indigo-400 font-normal" id="match-count-label"></span>
+                </div>
+                
+                <!-- MAÇ CANLI ARAMA KUTUSU -->
+                <div class="relative">
+                    <input type="text" id="match-search-input" oninput="filterMatchDropdown()" placeholder="🔍 Maç veya Takım Ara..." class="w-full bg-slate-900 border border-purple-custom rounded p-2 text-xs md:text-sm text-white focus:outline-none focus:border-indigo-500 mb-1">
+                </div>
+
+                <select id="match-dropdown" onchange="loadMatchDetail(this.value)" class="w-full bg-slate-900 border border-purple-custom rounded p-2.5 text-xs md:text-sm text-white">
+                    <option value="">MAÇ SEÇİNİZ</option>
+                </select>
+            </div>
+
+            <div id="match-detail-card" class="hidden space-y-4 md:space-y-6">
+                <!-- MAÇ ORAN YÜZDELERİ -->
+                <div class="bg-purple-panel p-3 md:p-5 rounded-lg border border-purple-custom space-y-3">
+                    <h3 class="text-sm md:text-base font-bold text-white">📊 MAÇ İSTATİSTİKLERİ VE ORAN YÜZDELERİ</h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 md:gap-3 text-center">
+                        <div class="bg-purple-card p-2 md:p-3 rounded border border-purple-custom">
+                            <div class="text-[10px] md:text-xs text-slate-400">MS 1</div>
+                            <div id="det-ms1" class="text-base md:text-xl font-bold text-emerald-400">-%</div>
+                        </div>
+                        <div class="bg-purple-card p-2 md:p-3 rounded border border-purple-custom">
+                            <div class="text-[10px] md:text-xs text-slate-400">MS X</div>
+                            <div id="det-msx" class="text-base md:text-xl font-bold text-amber-400">-%</div>
+                        </div>
+                        <div class="bg-purple-card p-2 md:p-3 rounded border border-purple-custom">
+                            <div class="text-[10px] md:text-xs text-slate-400">MS 2</div>
+                            <div id="det-ms2" class="text-base md:text-xl font-bold text-rose-400">-%</div>
+                        </div>
+                        <div class="bg-purple-card p-2 md:p-3 rounded border border-purple-custom">
+                            <div class="text-[10px] md:text-xs text-slate-400">EV 0.5 ÜST</div>
+                            <div id="det-ev05" class="text-base md:text-xl font-bold text-white">-%</div>
+                        </div>
+                        <div class="bg-purple-card p-2 md:p-3 rounded border border-purple-custom">
+                            <div class="text-[10px] md:text-xs text-slate-400">DEP 0.5 ÜST</div>
+                            <div id="det-dep05" class="text-base md:text-xl font-bold text-white">-%</div>
+                        </div>
+                        <div class="bg-purple-card p-2 md:p-3 rounded border border-purple-custom">
+                            <div class="text-[10px] md:text-xs text-slate-400">KG VAR</div>
+                            <div id="det-kgvar" class="text-base md:text-xl font-bold text-white">-%</div>
+                        </div>
+                        <div class="bg-purple-card p-2 md:p-3 rounded border border-purple-custom">
+                            <div class="text-[10px] md:text-xs text-slate-400">ÜST 2.5</div>
+                            <div id="det-ust25" class="text-base md:text-xl font-bold text-purple-400">-%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAHMİNİ SKORLAR -->
+                <div class="bg-purple-panel p-3 md:p-5 rounded-lg border border-purple-custom space-y-3">
+                    <h3 class="text-sm md:text-base font-bold text-white">🎯 TAHMİNİ SKORLAR</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-purple-card text-slate-400">
+                                <tr><th class="p-2">SKOR</th><th class="p-2">ADET</th></tr>
+                            </thead>
+                            <tbody id="scores-table-body" class="divide-y divide-purple-custom"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- BENZER GEÇMİŞ MAÇLAR -->
+                <div class="bg-purple-panel p-3 md:p-5 rounded-lg border border-purple-custom space-y-3">
+                    <h3 class="text-sm md:text-base font-bold text-white">🟢 BENZER GEÇMİŞ MAÇLAR VE ORANLARI</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-[11px] md:text-xs min-w-[650px]">
+                            <thead class="bg-purple-card text-slate-400">
+                                <tr>
+                                    <th class="p-2">MAÇ</th>
+                                    <th class="p-2">SKOR</th>
+                                    <th class="p-2">MS1</th>
+                                    <th class="p-2">MSX</th>
+                                    <th class="p-2">MS2</th>
+                                    <th class="p-2">2.5 ÜST</th>
+                                    <th class="p-2">2.5 ALT</th>
+                                    <th class="p-2">EV TAKIMI</th>
+                                    <th class="p-2">DEP TAKIMI</th>
+                                    <th class="p-2">BENZERLİK</th>
+                                </tr>
+                            </thead>
+                            <tbody id="similar-table-body" class="divide-y divide-purple-custom"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SAYFA 3: BUGÜNÜN ENLERİ -->
+        <div id="page-enler" class="hidden space-y-4 md:space-y-6">
+            <h2 class="text-xl md:text-2xl font-bold text-white">🔥 BUGÜNÜN ENLERİ (TOP 15 LİSTELERİ)</h2>
+            
+            <div class="flex flex-wrap gap-1.5 md:gap-2 bg-purple-panel p-2 md:p-3 rounded-lg border border-purple-custom" id="enler-btn-group">
+                <button onclick="renderEnlerCategory('ms1', this)" class="enler-btn flex-1 min-w-[70px] px-2 py-1.5 rounded text-[11px] md:text-xs font-bold bg-amber-600 border border-amber-500 text-white">MS 1</button>
+                <button onclick="renderEnlerCategory('msx', this)" class="enler-btn flex-1 min-w-[70px] px-2 py-1.5 rounded text-[11px] md:text-xs font-bold bg-purple-card border border-purple-custom text-slate-300">MS X</button>
+                <button onclick="renderEnlerCategory('ms2', this)" class="enler-btn flex-1 min-w-[70px] px-2 py-1.5 rounded text-[11px] md:text-xs font-bold bg-purple-card border border-purple-custom text-slate-300">MS 2</button>
+                <button onclick="renderEnlerCategory('over', this)" class="enler-btn flex-1 min-w-[80px] px-2 py-1.5 rounded text-[11px] md:text-xs font-bold bg-purple-card border border-purple-custom text-slate-300">2.5 ÜST</button>
+                <button onclick="renderEnlerCategory('under', this)" class="enler-btn flex-1 min-w-[80px] px-2 py-1.5 rounded text-[11px] md:text-xs font-bold bg-purple-card border border-purple-custom text-slate-300">2.5 ALT</button>
+                <button onclick="renderEnlerCategory('kg_var', this)" class="enler-btn flex-1 min-w-[80px] px-2 py-1.5 rounded text-[11px] md:text-xs font-bold bg-purple-card border border-purple-custom text-slate-300">KG VAR</button>
+                <button onclick="renderEnlerCategory('score_dominance', this)" class="enler-btn w-full sm:w-auto px-3 py-1.5 rounded text-[11px] md:text-xs font-bold bg-purple-card border border-purple-custom text-slate-300">🎯 SKOR DOMİNANSI</button>
+            </div>
+
+            <div id="enler-container" class="space-y-3">
+                <div class="text-slate-400 text-xs md:text-sm">Görüntülemek istediğiniz kategoriyi yukarıdan seçin.</div>
+            </div>
+        </div>
+
+        <!-- SAYFA 4: TAKIM DETAY -->
+        <div id="page-takim" class="hidden space-y-4 md:space-y-6">
+            <h2 class="text-xl md:text-2xl font-bold text-white">👥 TAKIM DETAY VERİTABANI (Min. 3 Maç)</h2>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 bg-purple-panel p-2 md:p-3 rounded-lg border border-purple-custom" id="team-btn-group">
+                <button onclick="loadTeamsByFilter('win', this)" class="team-btn px-3 py-2 rounded text-[11px] md:text-xs font-bold bg-amber-600 border border-amber-500 text-white">🏆 Kazanma Oranı En Yüksek</button>
+                <button onclick="loadTeamsByFilter('gollu', this)" class="team-btn px-3 py-2 rounded text-[11px] md:text-xs font-bold bg-purple-card border border-purple-custom text-slate-300">⚽ Genel Gollü Takımlar</button>
+                <button onclick="loadTeamsByFilter('home_gollu', this)" class="team-btn px-3 py-2 rounded text-[11px] md:text-xs font-bold bg-purple-card border border-purple-custom text-slate-300">🏠 Evinde Gollü Takımlar</button>
+                <button onclick="loadTeamsByFilter('away_gollu', this)" class="team-btn px-3 py-2 rounded text-[11px] md:text-xs font-bold bg-purple-card border border-purple-custom text-slate-300">✈️ Deplasmanda Gollü Takımlar</button>
+            </div>
+
+            <div class="bg-purple-panel rounded-lg border border-purple-custom p-3 md:p-4 space-y-3">
+                <!-- TAKIM CANLI ARAMA KUTUSU -->
+                <div class="relative">
+                    <input type="text" id="team-search-input" oninput="filterTeamTable()" placeholder="🔍 Takım Adı ile Filtrele..." class="w-full bg-slate-900 border border-purple-custom rounded p-2 text-xs md:text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-[11px] md:text-xs min-w-[550px]">
+                        <thead class="bg-purple-card text-slate-400">
+                            <tr>
+                                <th class="p-2">SIRA</th>
+                                <th class="p-2">TAKIM</th>
+                                <th class="p-2">TOPLAM MAÇ</th>
+                                <th class="p-2">GALİBİYET %</th>
+                                <th class="p-2">ORTALAMA GOL</th>
+                                <th class="p-2">EV GOL ORT</th>
+                                <th class="p-2">DEP GOL ORT</th>
+                            </tr>
+                        </thead>
+                        <tbody id="team-table-body" class="divide-y divide-purple-custom"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        const API_URL = "https://oran-analiz-backend.onrender.com";
+        let enlerCache = null;
+        let currentSource = 'history';
+
+        let rawMatchesList = [];
+        let rawTeamsList = [];
+
+        // 20 Saniyelik Kilit Mekanizması
+        let seconds = 20;
+        const timerElem = document.getElementById('timer');
+        const overlay = document.getElementById('initial-overlay');
+
+        const countdown = setInterval(() => {
+            seconds--;
+            timerElem.innerText = seconds;
+            if(seconds <= 0) {
+                clearInterval(countdown);
+                overlay.style.display = 'none';
+            }
+        }, 1000);
+
+        function switchTab(tab) {
+            ['tum', 'yeni', 'enler', 'takim'].forEach(t => {
+                const dot = document.getElementById(`dot-${t}`);
+                if (t === tab) {
+                    dot.className = "w-2.5 h-2.5 rounded-full bg-red-500 border border-red-400 flex-shrink-0";
+                } else {
+                    dot.className = "w-2.5 h-2.5 rounded-full border border-slate-400 flex-shrink-0";
+                }
+            });
+
+            document.getElementById('page-select-match').classList.toggle('hidden', tab === 'enler' || tab === 'takim');
+            document.getElementById('page-enler').classList.toggle('hidden', tab !== 'enler');
+            document.getElementById('page-takim').classList.toggle('hidden', tab !== 'takim');
+
+            if(tab === 'tum') {
+                document.getElementById('select-title').innerText = '📂 GEÇMİŞ TÜM MAÇLAR VERİTABANI ANALİZİ';
+                loadDropdownOptions('/api/tum-maclar-list', 'history');
+            } else if(tab === 'yeni') {
+                document.getElementById('select-title').innerText = '✨ YENİ ÇEKİLEN MAÇLARIN ANALİZİ';
+                loadDropdownOptions('/api/yeni-maclar-list', 'today');
+            } else if(tab === 'enler') {
+                loadEnlerData();
+            } else if(tab === 'takim') {
+                loadTeamsByFilter('win', document.querySelector('#team-btn-group button'));
+            }
+        }
+
+        async function loadDropdownOptions(endpoint, source) {
+            currentSource = source;
+            const dropdown = document.getElementById('match-dropdown');
+            const searchInput = document.getElementById('match-search-input');
+            
+            if(searchInput) searchInput.value = '';
+            dropdown.innerHTML = '<option value="">Yükleniyor...</option>';
+
+            try {
+                const res = await fetch(`${API_URL}${endpoint}`);
+                const json = await res.json();
+                
+                rawMatchesList = json.matches || [];
+                renderMatchOptions(rawMatchesList);
+            } catch(e){
+                dropdown.innerHTML = '<option value="">Maçlar yüklenemedi</option>';
+            }
+        }
+
+        function renderMatchOptions(list) {
+            const dropdown = document.getElementById('match-dropdown');
+            const countLabel = document.getElementById('match-count-label');
+            
+            if(countLabel) countLabel.innerText = `${list.length} Maç Listelendi`;
+            
+            dropdown.innerHTML = '<option value="">MAÇ SEÇİNİZ</option>' + 
+                list.map(m => `<option value="${m}">${m}</option>`).join('');
+        }
+
+        function filterMatchDropdown() {
+            const query = document.getElementById('match-search-input').value.toLowerCase().trim();
+            if(!query) {
+                renderMatchOptions(rawMatchesList);
+                return;
+            }
+            const filtered = rawMatchesList.filter(m => m.toLowerCase().includes(query));
+            renderMatchOptions(filtered);
+        }
+
+        async function loadMatchDetail(matchName) {
+            if(!matchName) return;
+            try {
+                const res = await fetch(`${API_URL}/api/mac-detay?mac=${encodeURIComponent(matchName)}&source=${currentSource}`);
+                const data = await res.json();
+
+                document.getElementById('det-ms1').innerText = '%' + (data.MS1_YUZDE || 0);
+                document.getElementById('det-msx').innerText = '%' + (data.MSX_YUZDE || 0);
+                document.getElementById('det-ms2').innerText = '%' + (data.MS2_YUZDE || 0);
+                document.getElementById('det-ev05').innerText = '%' + data.EV_05_YUZDE;
+                document.getElementById('det-dep05').innerText = '%' + data.DEP_05_YUZDE;
+                document.getElementById('det-kgvar').innerText = '%' + data.KG_YUZDE;
+                document.getElementById('det-ust25').innerText = '%' + data.OVER_YUZDE;
+
+                document.getElementById('scores-table-body').innerHTML = Object.entries(data.SCORE_COUNTS).map(([score, count]) => `
+                    <tr><td class="p-2 font-mono text-amber-300">${score}</td><td class="p-2">${count}</td></tr>
+                `).join('');
+
+                document.getElementById('similar-table-body').innerHTML = data.SIMILAR_MATCHES.map(s => `
+                    <tr class="hover:bg-purple-card">
+                        <td class="p-2 text-white font-bold">${s.MAC}</td>
+                        <td class="p-2 text-amber-400 font-bold">${s.SKOR}</td>
+                        <td class="p-2">${s.MS1}</td>
+                        <td class="p-2">${s.MSX}</td>
+                        <td class="p-2">${s.MS2}</td>
+                        <td class="p-2">${s.UST_2_5}</td>
+                        <td class="p-2">${s.ALT_2_5}</td>
+                        <td class="p-2">${s.HOME_TEAM}</td>
+                        <td class="p-2">${s.AWAY_TEAM}</td>
+                        <td class="p-2 text-emerald-400">${s.SIM}</td>
+                    </tr>
+                `).join('');
+
+                document.getElementById('match-detail-card').classList.remove('hidden');
+            } catch(e){}
+        }
+
+        async function loadEnlerData() {
+            if(!enlerCache) {
+                const res = await fetch(`${API_URL}/api/bugunun-enleri`);
+                enlerCache = await res.json();
+            }
+            renderEnlerCategory('ms1', document.querySelector('#enler-btn-group button'));
+        }
+
+        function renderEnlerCategory(cat, btnElem) {
+            if(!enlerCache) return;
+
+            if(btnElem) {
+                document.querySelectorAll('.enler-btn').forEach(b => {
+                    b.className = "enler-btn flex-1 min-w-[70px] sm:w-auto px-2 py-1.5 rounded text-[11px] md:text-xs font-bold bg-purple-card border border-purple-custom text-slate-300";
+                });
+                btnElem.className = "enler-btn flex-1 min-w-[70px] sm:w-auto px-2 py-1.5 rounded text-[11px] md:text-xs font-bold bg-amber-600 border border-amber-500 text-white";
+            }
+
+            const container = document.getElementById('enler-container');
+            const list = enlerCache[cat] || [];
+
+            if(list.length === 0) {
+                container.innerHTML = '<div class="text-slate-400 text-xs md:text-sm">Bu kategoride uygun maç bulunamadı.</div>';
+                return;
+            }
+
+            container.innerHTML = list.map((item, idx) => `
+                <div class="bg-purple-panel border border-purple-custom rounded-lg p-3 md:p-4 cursor-pointer hover:border-indigo-500 transition" onclick="toggleEnlerExpand(this)">
+                    <div class="flex justify-between items-center text-xs md:text-sm font-bold text-white">
+                        <div><span class="text-indigo-400 mr-1.5">#${idx + 1}</span> ${item.MAC}</div>
+                        <div class="text-[10px] md:text-xs text-emerald-400 font-normal">Min. 5 Benzer Maç ✓</div>
+                    </div>
+                    
+                    <div class="hidden mt-3 pt-3 md:mt-4 md:pt-4 border-t border-purple-custom space-y-3 md:space-y-4">
+                        <div class="text-[10px] md:text-xs font-bold text-amber-400 uppercase tracking-wider">Seçili Maç Oranları</div>
+                        <div class="grid grid-cols-3 sm:grid-cols-5 text-center text-[10px] md:text-xs gap-1.5 md:gap-2">
+                            <div class="bg-purple-card p-1.5 md:p-2 rounded">MS1: <b class="text-white">${item.MS1_ORAN || '-'}</b></div>
+                            <div class="bg-purple-card p-1.5 md:p-2 rounded">MSX: <b class="text-white">${item.MSX_ORAN || '-'}</b></div>
+                            <div class="bg-purple-card p-1.5 md:p-2 rounded">MS2: <b class="text-white">${item.MS2_ORAN || '-'}</b></div>
+                            <div class="bg-purple-card p-1.5 md:p-2 rounded">2.5 ÜST: <b class="text-white">${item.UST_ORAN || '-'}</b></div>
+                            <div class="bg-purple-card p-1.5 md:p-2 rounded">2.5 ALT: <b class="text-white">${item.ALT_ORAN || '-'}</b></div>
+                        </div>
+
+                        <div class="text-[10px] md:text-xs font-bold text-indigo-400 uppercase tracking-wider">Tahmin Yüzdeleri</div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 md:gap-2 text-center text-[10px] md:text-xs">
+                            <div class="bg-purple-card p-1.5 md:p-2 rounded">MS1: %${item.MS1_YUZDE}</div>
+                            <div class="bg-purple-card p-1.5 md:p-2 rounded">MSX: %${item.MSX_YUZDE}</div>
+                            <div class="bg-purple-card p-1.5 md:p-2 rounded">MS2: %${item.MS2_YUZDE}</div>
+                            <div class="bg-purple-card p-1.5 md:p-2 rounded">2.5 ÜST: %${item.OVER_YUZDE}</div>
+                            <div class="bg-purple-card p-1.5 md:p-2 rounded">KG VAR: %${item.KG_YUZDE}</div>
+                            <div class="bg-purple-card p-1.5 md:p-2 rounded">EV 0.5: %${item.EV_05_YUZDE}</div>
+                            <div class="bg-purple-card p-1.5 md:p-2 rounded">DEP 0.5: %${item.DEP_05_YUZDE}</div>
+                        </div>
+                        <div class="text-xs text-amber-300 font-bold">🎯 Baskın Skor: ${item.TOP_SCORE}</div>
+
+                        <div class="text-[10px] md:text-xs font-bold text-emerald-400 uppercase tracking-wider pt-1">Benzer Geçmiş Maçlar (${item.SIMILAR_MATCHES ? item.SIMILAR_MATCHES.length : 0} Maç)</div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-[11px] md:text-xs min-w-[600px]">
+                                <thead class="bg-purple-card text-slate-400">
+                                    <tr>
+                                        <th class="p-1.5">MAÇ</th>
+                                        <th class="p-1.5">SKOR</th>
+                                        <th class="p-1.5">MS1</th>
+                                        <th class="p-1.5">MSX</th>
+                                        <th class="p-1.5">MS2</th>
+                                        <th class="p-1.5">2.5 ÜST</th>
+                                        <th class="p-1.5">2.5 ALT</th>
+                                        <th class="p-1.5">EV</th>
+                                        <th class="p-1.5">DEP</th>
+                                        <th class="p-1.5">SIM</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-purple-custom">
+                                    ${(item.SIMILAR_MATCHES || []).map(s => `
+                                        <tr>
+                                            <td class="p-1.5 font-semibold text-white">${s.MAC}</td>
+                                            <td class="p-1.5 text-amber-300 font-bold">${s.SKOR}</td>
+                                            <td class="p-1.5">${s.MS1}</td>
+                                            <td class="p-1.5">${s.MSX}</td>
+                                            <td class="p-1.5">${s.MS2}</td>
+                                            <td class="p-1.5">${s.UST_2_5}</td>
+                                            <td class="p-1.5">${s.ALT_2_5}</td>
+                                            <td class="p-1.5">${s.HOME_TEAM}</td>
+                                            <td class="p-1.5">${s.AWAY_TEAM}</td>
+                                            <td class="p-1.5 text-emerald-400">${s.SIM}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleEnlerExpand(elem) {
+            const detailNode = elem.children[1];
+            if(detailNode) {
+                detailNode.classList.toggle('hidden');
+            }
+        }
+
+        async function loadTeamsByFilter(filterType, btnElem) {
+            if(btnElem) {
+                document.querySelectorAll('.team-btn').forEach(b => {
+                    b.className = "team-btn px-3 py-2 rounded text-[11px] md:text-xs font-bold bg-purple-card border border-purple-custom text-slate-300";
+                });
+                btnElem.className = "team-btn px-3 py-2 rounded text-[11px] md:text-xs font-bold bg-amber-600 border border-amber-500 text-white";
+            }
+
+            const tbody = document.getElementById('team-table-body');
+            const searchInput = document.getElementById('team-search-input');
+            if(searchInput) searchInput.value = '';
+
+            tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-400 text-xs">Yükleniyor...</td></tr>';
+            
+            try {
+                const res = await fetch(`${API_URL}/api/takimlar?filter=${filterType}`);
+                const data = await res.json();
+
+                rawTeamsList = data.teams || [];
+                renderTeamRows(rawTeamsList);
+            } catch(e){
+                tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-rose-400 text-xs">Veri yüklenirken hata oluştu.</td></tr>';
+            }
+        }
+
+        function renderTeamRows(teams) {
+            const tbody = document.getElementById('team-table-body');
+            if(!teams || teams.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-400 text-xs">Uygun takım bulunamadı.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = teams.map((t, idx) => `
+                <tr>
+                    <td class="p-2 font-bold text-slate-400">${idx + 1}</td>
+                    <td class="p-2 font-bold text-white">${t.name}</td>
+                    <td class="p-2 text-indigo-400 font-bold">${t.total_matches}</td>
+                    <td class="p-2 text-emerald-400 font-bold">%${t.win_rate}</td>
+                    <td class="p-2 text-amber-300 font-bold">${t.avg_goals}</td>
+                    <td class="p-2 text-slate-300">${t.home_avg_goals}</td>
+                    <td class="p-2 text-slate-300">${t.away_avg_goals}</td>
+                </tr>
+            `).join('');
+        }
+
+        function filterTeamTable() {
+            const query = document.getElementById('team-search-input').value.toLowerCase().trim();
+            if(!query) {
+                renderTeamRows(rawTeamsList);
+                return;
+            }
+            const filtered = rawTeamsList.filter(t => t.name.toLowerCase().includes(query));
+            renderTeamRows(filtered);
+        }
+
+        switchTab('tum');
+    </script>
+</body>
+</html>
